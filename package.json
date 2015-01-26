@@ -1,0 +1,11 @@
+{
+    "name": "glucose",
+    "description": "Application instance manager for use while developing your SugarCRM application.",
+    "version": "0.0.0",
+    "author": "SugarCRM",
+    "homepage": "https://github.com/glevine-sugarcrm/glucose",
+    "private": true,
+    "dependencies": {
+        "restify": "~2.8.5"
+    }
+}
