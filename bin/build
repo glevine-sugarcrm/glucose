@@ -1,0 +1,28 @@
+#!/bin/bash
+
+while getopts ":b:f:s:v:" o; do
+  case "${o}" in
+    b)
+        BUILD_DIR=${OPTARG}
+        ;;
+    f)
+        FLAVOR=${OPTARG}
+        ;;
+    s)
+        SRC_DIR=${OPTARG}
+        ;;
+    v)
+        VERSION=${OPTARG}
+        ;;
+    *)
+        ;;
+  esac
+done
+shift $((OPTIND-1))
+
+if [ -z "$PHP" ]; then
+    PHP=`which php`
+fi
+
+cd ${SRC_DIR}/build/rome
+${PHP} build.php --ver={$VERSION} --flav=${FLAVOR} --clean=1 --cleanCache=1 --build_dir=${BUILD_DIR} --retainCommentSpacing=1 --sidecar

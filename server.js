@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-var restify, server;
+var path, restify, server;
+
+path = require('path');
+global.appRoot = path.resolve(__dirname);
 
 restify = require('restify');
 
@@ -27,11 +30,12 @@ var mongoose, tungus;
 
 tungus = require('tungus');
 mongoose = require('mongoose');
-mongoose.connect('tingodb:///' + __dirname + '/db');
+mongoose.connect('tingodb:///' + appRoot + '/db');
 
 // models
 var AppModel = mongoose.model('Apps', mongoose.Schema({
-    containers: [String],
+    containers: [String], // docker containers that are used by the app
+    flavor: {type: String, default: 'ent'}, // flavor of the app
     source: String, // location of the source code
     stack: {
         database: {
@@ -48,8 +52,13 @@ var AppModel = mongoose.model('Apps', mongoose.Schema({
             version: String
         }
     },
-    tasks: [String]
+    status: String, // current task
+    tasks: [String],
+    version: {type: String, default: '7.7.0'}
 }));
+
+// tasks
+var tasks = require('./tasks');
 
 // routes
 server.get('/apps/', function(req, res, next) {
@@ -66,16 +75,25 @@ server.get('/apps/', function(req, res, next) {
 });
 
 server.post('/apps/', function(req, res, next) {
+    var data = req.params;
+
+    //TODO: error if no data.source
+
     function error(err) {
         next(err);
     }
 
-    function success(data) {
-        res.send(data);
+    function success(app) {
+        tasks.transition(app);
+        res.send(app);
         next();
     }
 
-    AppModel.create(req.params).then(success, error);
+    // must always start with building the app
+    data.tasks || (data.tasks = []);
+    data.tasks.unshift('build');
+
+    AppModel.create(data).then(success, error);
 });
 
 server.del('/apps/', function(req, res, next) {
