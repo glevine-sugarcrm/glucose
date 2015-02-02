@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 
-var fs, spawn;
+var Task, fs, spawn, util;
 
+Task = require('../task');
 fs = require('fs-extra');
 spawn = require('child_process').spawn;
+util = require('util');
 
-module.exports = function(app) {
-    var args, child, volume;
+function BuildTask() {
+    BuildTask.super_.apply(this, arguments);
+}
+
+util.inherits(BuildTask, Task);
+
+BuildTask.prototype.start = function(app) {
+    var args, child, self, volume;
+
+    self = this;
 
     volume = appRoot + '/volumes/' + app.id;
     fs.mkdirsSync(volume);
@@ -20,7 +30,8 @@ module.exports = function(app) {
     child = spawn(appRoot + '/bin/build', args);
 
     child.on('close', function(code) {
-        var tasks = require('./index');
-        tasks.transition(app);
+        self.emit('end', app);
     });
 };
+
+module.exports = BuildTask;

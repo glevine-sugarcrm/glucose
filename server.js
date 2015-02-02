@@ -33,7 +33,9 @@ mongoose = require('mongoose');
 mongoose.connect('tingodb:///' + appRoot + '/db');
 
 // models
-var AppModel = mongoose.model('Apps', mongoose.Schema({
+var AppModel;
+
+AppModel = mongoose.model('Apps', mongoose.Schema({
     containers: [String], // docker containers that are used by the app
     flavor: {type: String, default: 'ent'}, // flavor of the app
     source: String, // location of the source code
@@ -57,8 +59,43 @@ var AppModel = mongoose.model('Apps', mongoose.Schema({
     version: {type: String, default: '7.7.0'}
 }));
 
-// tasks
-var tasks = require('./tasks');
+var BuildTask, IdleTask, TaskProvider;
+
+IdleTask = require('./task');
+BuildTask = require('./tasks/build');
+TaskProvider = {
+    idle: IdleTask,
+    build: BuildTask
+};
+
+function transition(app) {
+    var last, next, tasks;
+
+    last = app.get('status');
+    tasks = app.get('tasks').slice();
+    next = tasks[tasks.indexOf(last) + 1];
+
+    if (!next || !TaskProvider[next]) {
+        next = 'idle';
+    }
+
+    if (last !== next) {
+        app.set({status: next});
+        app.save(function(err, app) {
+            var task;
+
+            if (err) {
+                //TODO: log the error
+            } else {
+                task = new TaskProvider[next]();
+                task.on('end', function(app) {
+                    transition(app);
+                });
+                task.start(app);
+            }
+        });
+    }
+}
 
 // routes
 server.get('/apps/', function(req, res, next) {
@@ -84,7 +121,7 @@ server.post('/apps/', function(req, res, next) {
     }
 
     function success(app) {
-        tasks.transition(app);
+        transition(app);
         res.send(app);
         next();
     }
