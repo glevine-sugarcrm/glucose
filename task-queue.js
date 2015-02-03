@@ -23,14 +23,17 @@ TaskQueue.prototype.process = function(app) {
     self = this;
     names = keys(this.tasks);
 
-    next();
+    if (names.length > 0) {
+        next();
+    } else {
+        done();
+    }
 
     function next(err) {
         var func, name, n;
 
         if (err) {
-            //TODO: log the error
-            done();
+            done(err);
             return;
         }
 
@@ -53,8 +56,20 @@ TaskQueue.prototype.process = function(app) {
         });
     }
 
-    function done() {
-        self.emit('end');
+    function done(err) {
+        if (err) {
+            self.emit('error', err);
+            return;
+        }
+
+        app.set({status: 'idle'});
+        app.save(function(err, app) {
+            if (err) {
+                self.emit('error', err);
+            } else {
+                self.emit('end');
+            }
+        });
     }
 };
 

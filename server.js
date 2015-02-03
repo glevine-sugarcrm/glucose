@@ -66,10 +66,22 @@ AppModelSchema = mongoose.Schema({
 });
 
 /**
- * Keep track of whether or not this model is new.
+ * Keep track of whether or not this model is new, for use in post-save
+ * middleware.
  */
 AppModelSchema.pre('save', function(next) {
     this.wasNew = this.isNew;
+
+    next();
+});
+
+/**
+ * Along with always building the app on create, set the status accordingly.
+ */
+AppModelSchema.pre('save', function(next) {
+    if (this.isNew) {
+        this.set('status', 'build');
+    }
 
     next();
 });
@@ -80,7 +92,7 @@ AppModelSchema.pre('save', function(next) {
 AppModelSchema.pre('save', function(next) {
     var tasks;
 
-    if (this.wasNew) {
+    if (this.isNew) {
         tasks = (this.get('tasks') || []).filter(function(task) {
             return task !== 'build';
         });
@@ -122,18 +134,22 @@ AppModelSchema.pre('save', function(next) {
  * Must always start with building the app.
  */
 AppModelSchema.post('save', function() {
+    var self = this;
+
     if (!this.wasNew) {
         return;
     }
 
-    allowedTasks['build'].call(this, this, function(err) {
+    function run(err) {
         var q = new TaskQueue();
 
-        this.get('tasks').forEach(function(task) {
+        self.get('tasks').forEach(function(task) {
             q.use(task, allowedTasks[task]);
         });
-        q.process(this);
-    });
+        q.process(self);
+    }
+
+    allowedTasks['build'].call(this, this, run);
 });
 
 /**
