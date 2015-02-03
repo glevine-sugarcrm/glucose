@@ -25,6 +25,12 @@ server.pre(function(req, res, next) {
     }
 });
 
+// tasks
+var TaskQueue, allowedTasks;
+
+TaskQueue = require('./task-queue');
+allowedTasks = require('require-all')(appRoot + '/tasks');
+
 // database
 var mongoose, tungus;
 
@@ -33,11 +39,11 @@ mongoose = require('mongoose');
 mongoose.connect('tingodb:///' + appRoot + '/db');
 
 // models
-var AppModel;
+var AppModel, AppModelSchema;
 
-AppModel = mongoose.model('Apps', mongoose.Schema({
-    containers: [String], // docker containers that are used by the app
+AppModelSchema = mongoose.Schema({
     flavor: {type: String, default: 'ent'}, // flavor of the app
+    machines: [String], // docker containers that are used by the app
     source: String, // location of the source code
     stack: {
         database: {
@@ -57,12 +63,89 @@ AppModel = mongoose.model('Apps', mongoose.Schema({
     status: String, // current task
     tasks: [String],
     version: {type: String, default: '7.7.0'}
-}));
+});
 
-// tasks
-var TaskQueue, RegisteredTasks;
-TaskQueue = require('./task-queue');
-RegisteredTasks = require('require-all')(appRoot + '/tasks');
+/**
+ * Keep track of whether or not this model is new.
+ */
+AppModelSchema.pre('save', function(next) {
+    this.wasNew = this.isNew;
+
+    next();
+});
+
+/**
+ * Do not allow the build task to run again on create.
+ */
+AppModelSchema.pre('save', function(next) {
+    var tasks;
+
+    if (this.wasNew) {
+        tasks = (this.get('tasks') || []).filter(function(task) {
+            return task !== 'build';
+        });
+        this.set('tasks', tasks);
+    }
+
+    next();
+});
+
+/**
+ * Do not allow the destroy task to run unless an app is being removed.
+ */
+AppModelSchema.pre('save', function(next) {
+    var tasks;
+
+    tasks = (this.get('tasks') || []).filter(function(task) {
+        return task !== 'destroy';
+    });
+    this.set('tasks', tasks);
+
+    next();
+});
+
+/**
+ * Filter out any tasks that are unknown.
+ */
+AppModelSchema.pre('save', function(next) {
+    var tasks;
+
+    tasks = (this.get('tasks') || []).filter(function(task) {
+        return allowedTasks[task];
+    });
+    this.set('tasks', tasks);
+
+    next();
+});
+
+/**
+ * Must always start with building the app.
+ */
+AppModelSchema.post('save', function() {
+    if (!this.wasNew) {
+        return;
+    }
+
+    allowedTasks['build'].call(this, this, function(err) {
+        var q = new TaskQueue();
+
+        this.get('tasks').forEach(function(task) {
+            q.use(task, allowedTasks[task]);
+        });
+        q.process(this);
+    });
+});
+
+/**
+ * Run the destroy task when removing an app.
+ */
+AppModelSchema.post('remove', function() {
+    allowedTasks['destroy'].call(this, this, function(err) {
+        // symbolic callback
+    });
+});
+
+AppModel = mongoose.model('Apps', AppModelSchema);
 
 // routes
 server.get('/apps/', function(req, res, next) {
@@ -79,34 +162,21 @@ server.get('/apps/', function(req, res, next) {
 });
 
 server.post('/apps/', function(req, res, next) {
-    var data = req.params;
-
-    //TODO: error if no data.source
-
     function error(err) {
         next(err);
     }
 
     function success(app) {
-        var queue, tasks;
-
-        queue = new TaskQueue();
-        app.get('tasks').forEach(function(task) {
-            if (RegisteredTasks[task]) {
-                queue.use(task, RegisteredTasks[task]);
-            }
-        });
-        queue.process(app);
-
         res.send(app);
         next();
     }
 
-    // must always start with building the app
-    data.tasks || (data.tasks = []);
-    data.tasks.unshift('build');
+    if (!req.params.source) {
+        error(new restify.MissingParameter('Missing parameter: source'));
+        return;
+    }
 
-    AppModel.create(data).then(success, error);
+    AppModel.create(req.params).then(success, error);
 });
 
 server.del('/apps/', function(req, res, next) {
@@ -119,7 +189,12 @@ server.del('/apps/', function(req, res, next) {
         next();
     }
 
-    AppModel.remove().exec().then(success, error);
+    AppModel.find({}).stream()
+        .on('error', error)
+        .on('data', function(app) {
+            app.remove();
+        })
+        .on('close', success);
 });
 
 server.get('/apps/:id', function(req, res, next) {
@@ -129,7 +204,7 @@ server.get('/apps/:id', function(req, res, next) {
 
     function success(app) {
         if (!app) {
-            next(new restify.ResourceNotFoundError('Could not find app ' + req.params.id));
+            error(new restify.ResourceNotFoundError('Could not find app ' + req.params.id));
         } else {
             res.send(app);
             next();
@@ -144,12 +219,28 @@ server.del('/apps/:id', function(req, res, next) {
         next(err);
     }
 
-    function success(app) {
+    function success() {
         res.send(204);
         next();
     }
 
-    AppModel.remove({_id: req.params.id}).exec().then(success, error);
+    function remove(err, app) {
+        if (err) {
+            error(err);
+        } else if (!app) {
+            error(new restify.ResourceNotFoundError('Could not find app ' + req.params.id));
+        } else {
+            app.remove(function(err) {
+                if (err) {
+                    error(err);
+                } else {
+                    success();
+                }
+            });
+        }
+    }
+
+    AppModel.findById(req.params.id, remove);
 });
 
 server.listen(3000, function() {
