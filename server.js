@@ -70,8 +70,8 @@ server.get('/apps/', function(req, res, next) {
         next(err);
     }
 
-    function success(data) {
-        res.send(data);
+    function success(apps) {
+        res.send(apps);
         next();
     }
 
@@ -114,7 +114,7 @@ server.del('/apps/', function(req, res, next) {
         next(err);
     }
 
-    function success(data) {
+    function success() {
         res.send(204);
         next();
     }
@@ -127,11 +127,11 @@ server.get('/apps/:id', function(req, res, next) {
         next(err);
     }
 
-    function success(data) {
-        if (!data) {
+    function success(app) {
+        if (!app) {
             next(new restify.ResourceNotFoundError('Could not find app ' + req.params.id));
         } else {
-            res.send(data);
+            res.send(app);
             next();
         }
     }
@@ -144,7 +144,7 @@ server.del('/apps/:id', function(req, res, next) {
         next(err);
     }
 
-    function success(data) {
+    function success(app) {
         res.send(204);
         next();
     }
