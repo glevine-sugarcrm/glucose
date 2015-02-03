@@ -59,43 +59,10 @@ AppModel = mongoose.model('Apps', mongoose.Schema({
     version: {type: String, default: '7.7.0'}
 }));
 
-var BuildTask, IdleTask, TaskProvider;
-
-IdleTask = require('./task');
-BuildTask = require('./tasks/build');
-TaskProvider = {
-    idle: IdleTask,
-    build: BuildTask
-};
-
-function transition(app) {
-    var last, next, tasks;
-
-    last = app.get('status');
-    tasks = app.get('tasks').slice();
-    next = tasks[tasks.indexOf(last) + 1];
-
-    if (!next || !TaskProvider[next]) {
-        next = 'idle';
-    }
-
-    if (last !== next) {
-        app.set({status: next});
-        app.save(function(err, app) {
-            var task;
-
-            if (err) {
-                //TODO: log the error
-            } else {
-                task = new TaskProvider[next]();
-                task.on('end', function(app) {
-                    transition(app);
-                });
-                task.start(app);
-            }
-        });
-    }
-}
+// tasks
+var TaskQueue, RegisteredTasks;
+TaskQueue = require('./task-queue');
+RegisteredTasks = require('require-all')(appRoot + '/tasks');
 
 // routes
 server.get('/apps/', function(req, res, next) {
@@ -121,7 +88,16 @@ server.post('/apps/', function(req, res, next) {
     }
 
     function success(app) {
-        transition(app);
+        var queue, tasks;
+
+        queue = new TaskQueue();
+        app.get('tasks').forEach(function(task) {
+            if (RegisteredTasks[task]) {
+                queue.use(task, RegisteredTasks[task]);
+            }
+        });
+        queue.process(app);
+
         res.send(app);
         next();
     }
