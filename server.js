@@ -172,6 +172,10 @@ AppModelSchema.post('save', function() {
 AppModelSchema.post('remove', function() {
     var q, task;
 
+    // mark this app as having been deleted so the queue doesn't attempt to
+    // make any changes to it
+    this.isDeleted = true;
+
     task = 'destroy';
     q = new TaskQueue();
     q.use(task, allowedTasks[task]);

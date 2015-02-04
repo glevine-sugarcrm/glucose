@@ -46,7 +46,7 @@ TaskQueue.prototype.process = function(app) {
             n = done;
         }
 
-        if (app) {
+        if (!app.isDeleted) {
             app.set({status: name});
             app.save(function(err, app) {
                 if (err) {
@@ -66,7 +66,7 @@ TaskQueue.prototype.process = function(app) {
             return;
         }
 
-        if (app) {
+        if (!app.isDeleted) {
             app.set({status: 'idle'});
             app.save(function(err, app) {
                 if (err) {
