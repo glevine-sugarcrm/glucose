@@ -46,14 +46,18 @@ TaskQueue.prototype.process = function(app) {
             n = done;
         }
 
-        app.set({status: name});
-        app.save(function(err, app) {
-            if (err) {
-                n(err);
-            } else {
-                func.call(self, app, n);
-            }
-        });
+        if (app) {
+            app.set({status: name});
+            app.save(function(err, app) {
+                if (err) {
+                    n(err);
+                } else {
+                    func.call(self, app, n);
+                }
+            });
+        } else {
+            func.call(self, app, n);
+        }
     }
 
     function done(err) {
@@ -62,14 +66,18 @@ TaskQueue.prototype.process = function(app) {
             return;
         }
 
-        app.set({status: 'idle'});
-        app.save(function(err, app) {
-            if (err) {
-                self.emit('error', err);
-            } else {
-                self.emit('end');
-            }
-        });
+        if (app) {
+            app.set({status: 'idle'});
+            app.save(function(err, app) {
+                if (err) {
+                    self.emit('error', err);
+                } else {
+                    self.emit('end');
+                }
+            });
+        } else {
+            self.emit('end');
+        }
     }
 };
 

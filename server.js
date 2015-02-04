@@ -145,31 +145,36 @@ AppModelSchema.pre('remove', function(next) {
  * Must always start with building the app.
  */
 AppModelSchema.post('save', function() {
-    var self = this;
+    var q, tasks;
 
     if (!this.wasNew) {
         return;
     }
 
-    function run(err) {
-        var q = new TaskQueue();
+    q = new TaskQueue();
 
-        self.get('tasks').forEach(function(task) {
-            q.use(task, allowedTasks[task]);
-        });
-        q.process(self);
-    }
+    tasks = this.get('tasks').slice();
+    tasks.unshift('build');
+    tasks.forEach(function(task) {
+        q.use(task, allowedTasks[task]);
+    });
 
-    allowedTasks['build'].call(this, this, run);
+    q.process(this);
 });
 
 /**
  * Run the destroy task when removing an app.
  */
 AppModelSchema.post('remove', function() {
-    allowedTasks['destroy'].call(this, this, function(err) {
-        // symbolic callback
+    var q, task;
+
+    task = 'destroy';
+    q = new TaskQueue();
+    q.use(task, allowedTasks[task]);
+    q.on('error', function(err) {
+        //TODO: handle error
     });
+    q.process(this);
 });
 
 AppModel = mongoose.model('Apps', AppModelSchema);
