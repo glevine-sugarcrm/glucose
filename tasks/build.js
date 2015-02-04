@@ -24,4 +24,4 @@ function build(app, next) {
     });
 }
 
-module.exports = build;
+module.exports = exports = build;

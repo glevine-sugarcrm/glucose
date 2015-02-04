@@ -87,4 +87,4 @@ TaskQueue.prototype.process = function(app) {
     }
 };
 
-module.exports = TaskQueue;
+module.exports = exports = TaskQueue;

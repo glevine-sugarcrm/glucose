@@ -8,4 +8,4 @@ function destroy(app, next) {
     });
 }
 
-module.exports = destroy;
+module.exports = exports = destroy;
