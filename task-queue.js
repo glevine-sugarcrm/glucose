@@ -21,6 +21,12 @@ TaskQueue.prototype.process = function(app) {
     var names, self;
 
     self = this;
+
+    if (!app) {
+        done(new Error('Cannot run tasks if there is no app on which to run them'));
+        return;
+    }
+
     names = keys(this.tasks);
 
     if (names.length > 0) {
