@@ -39,7 +39,9 @@ mongoose = require('mongoose');
 mongoose.connect('tingodb:///' + appRoot + '/db');
 
 // models
-var AppModel, AppModelSchema;
+var AppModel, AppModelSchema, uuid;
+
+uuid = require('mongoose-uuid');
 
 AppModelSchema = mongoose.Schema({
     flavor: {type: String, default: 'ent'}, // flavor of the app
@@ -63,7 +65,9 @@ AppModelSchema = mongoose.Schema({
     status: String, // current task
     tasks: [String],
     version: {type: String, default: '7.7.0'}
-});
+}, {_id: false});
+
+AppModelSchema.plugin(uuid.plugin, 'Apps');
 
 /**
  * Keep track of whether or not this model is new, for use in post-save
