@@ -131,6 +131,17 @@ AppModelSchema.pre('save', function(next) {
 });
 
 /**
+ * Only idle apps can be removed.
+ */
+AppModelSchema.pre('remove', function(next) {
+    if (this.get('status') === 'idle') {
+        next();
+    } else {
+        next(new Error('Only idle apps can be removed'));
+    }
+});
+
+/**
  * Must always start with building the app.
  */
 AppModelSchema.post('save', function() {
@@ -205,7 +216,8 @@ server.del('/apps/', function(req, res, next) {
         next();
     }
 
-    AppModel.find({}).stream()
+    AppModel.find({status: 'idle'})
+        .stream()
         .on('error', error)
         .on('data', function(app) {
             app.remove();
