@@ -10,6 +10,7 @@
         "lodash": "~3.0.1",
         "mongoose": "^3.8.21",
         "mongoose-uuid": "~0.0.2",
+        "q": "~1.1.2",
         "require-all": "~1.0.0",
         "restify": "~2.8.5",
         "tingodb": "~0.3.3",
